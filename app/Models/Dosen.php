@@ -16,4 +16,9 @@ class Dosen extends Model
     public function matkuls(){
         return $this->hasMany(MatKul::class,'dosen_id');
     }
+
+    public function user()
+    {
+        return $this->hasOne(User::class,'dosen_id');
+    }
 }

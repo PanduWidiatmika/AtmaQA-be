@@ -3,7 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Mahasiswa;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Exception;
+
 
 class MahasiswaController extends Controller
 {
@@ -14,7 +19,12 @@ class MahasiswaController extends Controller
      */
     public function index()
     {
-        $mahasiswa = Mahasiswa::all();
+        // $mahasiswa = Mahasiswa::all()->where('status','aktif');
+
+        $mahasiswa = DB::table('mahassiwa')
+                            ->select('*')
+                            ->where('status','aktif')
+                            ->get();
 
         if(count($mahasiswa)>0) {
             return response()->json([
@@ -49,14 +59,32 @@ class MahasiswaController extends Controller
         $mahasiswa->mahasiswa_name = $request["name"];
         $mahasiswa->npm = $request["npm"];
         $mahasiswa->email_mahasiswa = $request["email"];
-        $mahasiswa->password_mahasiswa = $request["password"];
+        $mahasiswa->status_mahasiswa = 0;
+        $mahasiswa->password_mahasiswa = Hash::make($request["password"]); //cek nanti
+        $mahasiswa->status = 'aktif';
 
         if ($mahasiswa->save()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Add Mahasiswa Success!',
-                'mahasiswa' => $mahasiswa,
-            ], 200);
+            $user = new User();
+            $user->email = $mahasiswa->email_mahasiswa;
+            $user->password = $mahasiswa->password_mahasiswa;
+            $user->dosen_id = null;
+            $user->mahasiswa_id = $mahasiswa->mahasiswa_id;
+            $user->status = $mahasiswa->status;
+
+            if ($user->save()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Add Mahasiswa Success!',
+                    'mahasiswa' => $mahasiswa,
+                    'user' => $user,
+                ], 200);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Add Mahasiswa Failed!',
+                    'user' => $user,
+                ], 400);
+            }
         } else {
             return response()->json([
                 'success' => false,
@@ -64,6 +92,7 @@ class MahasiswaController extends Controller
                 'mahasiswa' => $mahasiswa,
             ], 400);
         }
+        
     }
 
     /**
@@ -81,6 +110,41 @@ class MahasiswaController extends Controller
         ], 200);
     }
 
+
+    //search
+    public function search(Request $request)
+    {
+        try{
+            $mahasiswa = DB::table('mahasiswa')
+                                ->select(
+                                    'mahasiswa_id',
+                                    'mahasiswa_name',
+                                    'npm'
+                                )
+                                ->where('npm', 'LIKE', "$request->npm%")
+                                ->get();
+
+            if(count($mahasiswa)>0){
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Retrieve Mahasiswa Success!',
+                    'mahasiswa' => $mahasiswa,
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Retrieve Mahasiswa Empty!',
+                'mahasiswa' => null,
+            ],200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message'=>$e->getMessage()
+            ], 401);
+        }
+    }
+
     /**
      * Update the specified resource in storage.
      *
@@ -94,29 +158,78 @@ class MahasiswaController extends Controller
             'name' => ['required'],
             'npm' => ['required'],
             'email' => ['required'],
-            'password' => ['required'],
+            // 'password' => ['required'],
         ]);
 
-        $mahasiswa = new Mahasiswa();
-        $mahasiswa->mahasiswa_name = $request["name"];
-        $mahasiswa->npm = $request["npm"];
-        $mahasiswa->email_mahasiswa = $request["email"];
-        $mahasiswa->password_mahasiswa = $request["password"];
-        
-        if ($mahasiswa->save()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Update Mahasiswa Success!',
-                'mahasiswa' => $mahasiswa,
-            ], 200);
+        if($request['password'] === $mahasiswa->password_mahasiswa){
+            $mahasiswa->mahasiswa_name = $request["name"];
+            $mahasiswa->npm = $request["npm"];
+            $mahasiswa->email_mahasiswa = $request["email"];
+            $mahasiswa->password_mahasiswa = $mahasiswa->password_mahasiswa;
+            
+            if ($mahasiswa->save()) {
+                $user = $mahasiswa->user;
+                $user->email = $mahasiswa->email_mahasiswa;
+                $user->password = $mahasiswa->password_mahasiswa;
+                $user->dosen_id = null;
+                $user->mahasiswa_id = $mahasiswa->mahasiswa_id;
+    
+                if ($user->save()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Update Mahasiswa Success!',
+                        'mahasiswa' => $mahasiswa,
+                        'user' => $user,
+                    ], 200);
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Update Mahasiswa Failed!',
+                        'user' => $user,
+                    ], 400);
+                }
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Update Mahasiswa Failed!',
+                    // 'mahasiswa' => $mahasiswa,
+                ], 400);
+            }
         } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Update Mahasiswa Failed!',
-                'mahasiswa' => $mahasiswa,
-            ], 400);
+            $mahasiswa->mahasiswa_name = $request["name"];
+            $mahasiswa->npm = $request["npm"];
+            $mahasiswa->email_mahasiswa = $request["email"];
+            $mahasiswa->password_mahasiswa = Hash::make($request["password"]);
+
+            if ($mahasiswa->save()) {
+                $user = $mahasiswa->user;
+                $user->email = $mahasiswa->email_mahasiswa;
+                $user->password = $mahasiswa->password_mahasiswa;
+                $user->dosen_id = null;
+                $user->mahasiswa_id = $mahasiswa->mahasiswa_id;
+    
+                if ($user->save()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Update Mahasiswa Success!',
+                        'mahasiswa' => $mahasiswa,
+                        'user' => $user,
+                    ], 200);
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Update Mahasiswa Failed!',
+                        'user' => $user,
+                    ], 400);
+                }
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Update Mahasiswa Failed!',
+                    // 'mahasiswa' => $mahasiswa,
+                ], 400);
+            }
         }
-        
     }
 
     /**
@@ -125,8 +238,76 @@ class MahasiswaController extends Controller
      * @param  \App\Models\Dosen  $dosen
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Dosen $dosen)
+    public function destroy(Mahasiswa $mahasiswa, Request $request)
     {
-        //
+        try{
+            DB::table('mahasiswa')
+                ->where('mahasiswa_id',$request->id)
+                ->update([
+                    'status'=>'nonaktif',
+                ]);
+
+            // DB::table('users')->where('mahasiswa_id',$request->id)->delete();
+
+            return response() -> json([
+                'success' => true,
+                'message' => `Mahasiswa Deleted!`
+            ],200);
+        }catch(Exception $e){
+            return response()->json([
+                'success' => false,
+                'message' => 'Delete Mahasiswa Failed!'
+            ]);
+        }
+    }
+
+    //change status
+    public function changeStatsMhs(Request $request){
+        try{
+            $cek = DB::table('mahasiswa')
+                        ->select('status_mahasiswa')
+                        ->where('mahasiswa_id',$request->id)
+                        ->first();
+
+                        // return response() -> json([
+                        //     'success' => true,
+                        //     'message' => $cek->status_mahasiswa
+                        // ],200);            
+
+            if($cek->status_mahasiswa === "1"){
+                DB::table('mahasiswa')
+                    ->where('mahasiswa_id',$request->id)
+                    ->update([
+                        'status_mahasiswa'=>"0",
+                    ]);
+    
+                // DB::table('users')->where('mahasiswa_id',$request->id)->delete();
+    
+                return response() -> json([
+                    'success' => true,
+                    'message' => `Status Changed!`
+                ],200);
+            }else{
+                DB::table('mahasiswa')
+                    ->where('mahasiswa_id',$request->id)
+                    ->update([
+                        'status_mahasiswa'=>"1",
+                    ]);
+    
+                // DB::table('users')->where('mahasiswa_id',$request->id)->delete();
+    
+                return response() -> json([
+                    'success' => true,
+                    // 'a' => 'a',
+                    'message' => `Status Changed!`,
+                ],200);
+            }
+
+        }catch(Exception $e){
+            return response()->json([
+                'success' => false,
+                'message' => 'Status Change Failed!'
+            ]);
+        }
     }
 }

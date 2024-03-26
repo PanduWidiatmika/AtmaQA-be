@@ -23,4 +23,9 @@ class Mahasiswa extends Model
                     ->withPivot(['jawaban','score'])
                     ->as('jawaban_mhs');
     }
+
+    public function user()
+    {
+        return $this->hasOne(User::class,'mahasiswa_id');
+    }
 }

@@ -7,23 +7,37 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Validator;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
     public function login(Request $request){
-        //set validation
-        $validator = Validator::make($request->all(), [
-            'username'  => 'required',
-            'password'  => 'required'
-        ]);
+        $credentials = $request->only(['email','password']);
 
-        //if validation fails
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+        
+        if(Auth::attempt($credentials)) {
+            $user = \Auth::user();
+            $token = $user->createToken('MyApp')->accessToken;
+            // return response()->json([
+            //     'jamet' => $credentials
+            // ]);
+
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+            ]);
         }
 
-        if($user = DB::table('users')->where('username',$request->username)->first()){
-            
-        }
+        return response()->json(['error' => 'Unauthenticated'],401);
     }
+
+    public function logout(Request $request)
+    {
+        
+        $request->user()->token()->revoke();
+        $request->user()->token()->delete();
+
+        return response()->json(['message' => 'Successfully Logged Out!']);
+    }
+
 }
